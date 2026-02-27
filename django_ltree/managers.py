@@ -1,6 +1,11 @@
+from typing import TYPE_CHECKING
+
 from django.db import models
 
 from django_ltree.fields import PathValue
+
+if TYPE_CHECKING:
+    from django_ltree.models import TreeModel
 
 
 class TreeQuerySet(models.QuerySet):
@@ -12,6 +17,10 @@ class TreeQuerySet(models.QuerySet):
 
 
 class TreeManager(models.Manager):
+    def __init__(self, path_field="id", *args, **kwargs):
+        self.path_field = path_field
+        super().__init__(*args, **kwargs)
+
     def get_queryset(self):
         return TreeQuerySet(model=self.model, using=self._db).order_by("path")
 
@@ -21,7 +30,7 @@ class TreeManager(models.Manager):
     def children(self, path):
         return self.filter().children(path)
 
-    def create_child(self, parent: models.Model | PathValue | None = None, **kwargs):
+    def create_child(self, parent: "TreeModel | PathValue | None" = None, **kwargs):
         """
         create an item
         `parent` can be an instance of the model or a PathValue object
@@ -32,32 +41,32 @@ class TreeManager(models.Manager):
         if not parent:
             return self.create(**kwargs)
 
-        prefix = parent.path if isinstance(parent, models.Model) else parent
+        prefix = parent.path if isinstance(parent, models.Model) else parent  # ty:ignore[unresolved-attribute]
 
         obj = self._create(**kwargs)
 
-        path = PathValue([*prefix, obj.id])
-        self.filter(id=obj.id).update(path=path)
+        path = PathValue([*prefix, getattr(obj, self.path_field)])
+        self.filter(**{self.path_field: getattr(obj, self.path_field)}).update(path=path)
 
         obj.path = path
 
         return obj
 
-    create_child.alters_data = True
+    create_child.alters_data = True  # ty:ignore[unresolved-attribute]
 
     def create(self, **kwargs):
         """create an item with no parents (root)"""
         kwargs.pop("path", None)
         obj = self._create(**kwargs)
 
-        path = PathValue([obj.id])
-        self.filter(id=obj.id).update(path=path)
+        path = PathValue([getattr(obj, self.path_field)])
+        self.filter(**{self.path_field: getattr(obj, self.path_field)}).update(path=path)
 
         obj.path = path
 
         return obj
 
-    create.alters_data = True
+    create.alters_data = True  # ty:ignore[unresolved-attribute]
 
     def _create(self, **kwargs):
         """
@@ -78,4 +87,4 @@ class TreeManager(models.Manager):
         obj.save(force_insert=True, using=self.db)
         return obj
 
-    _create.alters_data = True
+    _create.alters_data = True  # ty:ignore[unresolved-attribute]

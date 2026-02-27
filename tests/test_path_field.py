@@ -2,7 +2,7 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from django_ltree.fields import PathValue, path_label_validator
-from tests.taxonomy.models import Taxonomy
+from tests.taxonomy.models import Taxonomy, TaxonomyName
 
 
 @pytest.mark.django_db
@@ -62,3 +62,19 @@ class TestPathField:
             PathValue("root/child.grandchild")
 
         assert str(excinfo.value) == "PathValue cannot mix slashes and dots in the same value"
+
+
+def test_id_path(db):
+    animalia: Taxonomy = Taxonomy.t_objects.create(name="Animalia")
+    chrodata = animalia.add_child(name="Chordata")
+
+    assert animalia.path == PathValue(f"{animalia.id}")
+    assert chrodata.path == PathValue(f"{animalia.id}.{chrodata.id}")
+
+
+def test_string_path(db):
+    animalia: TaxonomyName = TaxonomyName.t_objects.create(name="Animalia")
+    chrodata = animalia.add_child(name="Chordata")
+
+    assert animalia.path == PathValue("Animalia")
+    assert chrodata.path == PathValue("Animalia.Chordata")

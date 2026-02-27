@@ -12,7 +12,7 @@ from .managers import TreeManager
 
 
 class TreeModel(models.Model):
-    path: PathValue = PathField(unique=True, null=True, blank=True)  # pyright: ignore[reportAssignmentType]
+    path: PathValue = PathField(unique=True, null=True, blank=True)  # ty:ignore[invalid-assignment]
 
     t_objects: TreeManager = TreeManager()
 
@@ -34,8 +34,9 @@ class TreeModel(models.Model):
         return type(self).t_objects.filter(path__descendants=self.path)
 
     def parent(self) -> Self | None:
+        path_field = type(self).t_objects.path_field
         if len(self.path) > 1:
-            return self.ancestors().exclude(id=self.id).last()  # pyright: ignore[reportReturnType, reportAttributeAccessIssue]
+            return self.ancestors().exclude(**{path_field: getattr(self, path_field)}).last()  # pyright: ignore[reportReturnType, reportAttributeAccessIssue]
 
     def get_root(self) -> Self:
         func = Subpath(models.Value(str(self.path)), 0, 1)
@@ -77,7 +78,7 @@ class TreeModel(models.Model):
 
         return type(self).t_objects.filter(path__descendants=self.path).update(path=data)
 
-    def delete(self, cascade=False, **kwargs) -> tuple[int, dict[str, int]]:
+    def delete(self, cascade=False, **kwargs) -> tuple[int, dict[str, int]]:  # ty:ignore[invalid-method-override]
         children = self.children()
 
         # keeping the descendants

@@ -24,7 +24,7 @@ The main benefits of `ltree`:
 
 ## Requirements
 
-- Django 5.2+ 
+- Django 5.2+
 - Python 3.11+
 - PostgreSQL 14+ (with ltree extension enabled)
 
@@ -53,14 +53,15 @@ The main benefits of `ltree`:
    ```
 
 ## Usage
+
 `django-ltree` provides a base model class called `TreeModel`.
 
 `TreeModel` does these things out of the box:
 
-* adds a field called `path` to your model (path is created by items Id plus all parent Ids)
-* adds `t_objects` which is the `TreeManager` you can use to work with tree data
-* adds two indexes for `path` (one `BTreeIndex`, one `GistIndex`)
-* orders items base on `path`
+- adds a field called `path` to your model (by default, path is created by items Id plus parent's path)
+- adds `t_objects` which is the `TreeManager` you can use to work with tree data
+- adds two indexes for `path` (one `BTreeIndex`, one `GistIndex`)
+- orders items base on `path`
 
 if you are overriding the `Meta` class of your model, you may want to inherit from TreeModel.Meta.
 
@@ -74,6 +75,7 @@ to keep the indexes and ordering.
 ## Quick Start
 
 1. inherit from TreeModel:
+
    ```python
    from django_ltree.models import TreeModel
 
@@ -81,8 +83,8 @@ to keep the indexes and ordering.
        name = models.CharField(max_length=50)
    ```
 
-
 2. Create tree nodes:
+
    ```python
    # make an item without a parent (root)
    root = Category.t_objects.create(name="Root") 
@@ -95,6 +97,7 @@ to keep the indexes and ordering.
 note that `path` is handled by `django-ltree`, you don't need to pass any value for it
 
 3. Query ancestors and descendants:
+
    ```python
    # Get all ancestors
    child.ancestors()
@@ -103,7 +106,62 @@ note that `path` is handled by `django-ltree`, you don't need to pass any value 
    child.descendants()
    ```
 
+
+### Alternate paths
+
+paths are made using the objects `id` and (if exists) it's parent's path.
+
+if you need to use a different field for path generation, configure it like this:
+
+```py
+  class Role(TreeModel):
+      name = CharField()
+
+      t_objects = TreeManager(path_field="name")
+```
+
+now paths are created using the `name` field
+
+```py
+  su = Role.t_objects.create(name="SuperUser")
+  print(su.path)  # PathField("SuperUser")
+  admin = su.add_child(name="Admin")
+  print(admin.path)  # PathField("SuperUser.Admin")
+```
+
+when using an alternative field for path generation, it is recommended to use a
+field that ensures uniqueness to avoid confilicts.
+
+if you are using a field that is not auto-generated (like name in the example
+above), it is recommended to overwrite `TreeManager.create` and
+`TreeManager.create_child` like this:
+
+```py
+class MyTreeManager(TreeManager):
+    def create(self, **kwargs):
+        """create an item with no parents (root)"""
+        kwargs["path"] = PathValue([kwargs[self.path_field]])
+        obj = self._create(**kwargs)
+
+        return obj
+
+    def create_child(self, parent: "TreeModel | PathValue | None" = None, **kwargs):
+        if not parent:
+            return self.create(**kwargs)
+
+        prefix = parent.path if isinstance(parent, models.Model) else parent  
+        kwargs["path"] = PathValue([*prefix, kwargs[self.path_field]])
+
+        obj = self._create(**kwargs)
+        return obj
+```
+
+for slightly better performance and less overhead.
+
+this does not work for auto-generated fields like `id`.
+
 ### TreeModel methods
+
 `TreeModel` has the following methods:
 
 1. `label(self)`: returns the last part of `path`
@@ -135,7 +193,9 @@ if cascade is True, all the descendants are also deleted, otherwise they will mo
 
 
 ### TreeManager methods
+
 `TreeManager` has the following methods
+
 1. `create_child(self, parent=None, **kwargs)`: creates an item
 if `parent` is provided, it will become the parent item of the created item, otherwise creation will happen as root
 `kwargs` are the model fields used to create the item
@@ -149,13 +209,15 @@ if `parent` is provided, it will become the parent item of the created item, oth
 
 
 ### lookups and functions
-for a list of all available operations and functions for ltree check https://www.postgresql.org/docs/current/ltree.html#LTREE-OPS-FUNCS
 
-#### provided lookups:
+for a list of all available operations and functions for ltree check <https://www.postgresql.org/docs/current/ltree.html#LTREE-OPS-FUNCS>
+
+#### provided lookups
+
 1. `exact` (same as `=` in postgresql)
 `TreeModel.t_objects.filter(path__exact=path)`
 
-2. `ancestors` (same as `@>` in postgresql) 
+2. `ancestors` (same as `@>` in postgresql)
 `TreeModel.t_objects.filter(path__ancestors=path)`
 
 3. `descendants` (same as `<@` in postgresql)
@@ -171,12 +233,12 @@ for a list of all available operations and functions for ltree check https://www
 `TreeModel.t_objects.filter(path__depth=len(path) + 1)`
 
 #### provided functions
+
 1. `django_ltree.functions.NLevel`
 same as NLEVEL function from postgresql
 
 2. `django_ltree.functions.Subpath`
 same as `SUBPATH` functions from postgresql
-
 
 for concatenation (`||`) you can use `django.db.models.functions.Concat`
 
@@ -193,10 +255,10 @@ For complete documentation, see [TODO: Add Documentation Link].
 
 ## Links
 
-- **Source Code**: https://github.com/mariocesar/django-ltree
-- **Bug Reports**: https://github.com/mariocesar/django-ltree/issues
-- **PyPI Package**: https://pypi.org/project/django-ltree/
-- **PostgreSQL ltree Docs**: https://www.postgresql.org/docs/current/ltree.html
+- **Source Code**: <https://github.com/mariocesar/django-ltree>
+- **Bug Reports**: <https://github.com/mariocesar/django-ltree/issues>
+- **PyPI Package**: <https://pypi.org/project/django-ltree/>
+- **PostgreSQL ltree Docs**: <https://www.postgresql.org/docs/current/ltree.html>
 
 ## Contributing
 
